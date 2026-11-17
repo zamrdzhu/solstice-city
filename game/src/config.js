@@ -1,109 +1,61 @@
-// Solstice City tuning: every number the rest of the game reads lives here, so a
-// balance pass touches one file. Coordinates are metres, +X east, +Z south, Y up.
-// The city is a 9x9 street grid; the sea and beach sit west of x = -216.
-export const CITY = {
-  half: 216,            // half-size of the built-up city square
-  block: 36,            // block side length
-  road: 12,             // road width
-  pitch: 48,            // street centreline spacing (block + road)
-  streets: [-192, -144, -96, -48, 0, 48, 96, 144, 192],
-  // Road centrelines run BETWEEN the blocks: a block centred at bx has its
-  // edges at bx +/- 18, so the road beside it is centred at bx +/- 24.
-  roads: [-168, -120, -72, -24, 24, 72, 120, 168],
-  seaX: -264,           // where the water starts
-  beachX: -216,         // where the sand starts
-  pierZ: 96,            // pier runs west from the beach at this z
-  safehouse: { x: 168, z: 168 },
-  plaza: { x: 0, z: 0 },
-  marina: { x: -168, z: -168 },
-  garage: { x: 168, z: -168 },
-  dealership: { x: -96, z: 120 },
-};
+// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
+// the renderer scales it to the window, so no rule below depends on the screen size.
+
+export const FIELD = { width: 1280, height: 720, groundY: 664 };
+
+/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
+export const STEP = 1 / 60;
 
 export const PLAYER = {
-  walkSpeed: 6.5,
-  sprintSpeed: 10.5,
-  radius: 0.55,
-  maxHealth: 100,
-  startCash: 120,
+  width: 72,
+  height: 24,
+  speed: 560,
+  invulnerable: 1.5,
 };
 
-export const CAR = {
-  accel: 16,
-  brake: 30,
-  maxSpeed: 34,
-  maxReverse: 10,
-  steer: 1.9,
-  grip: 6.5,
-  radius: 1.6,
+export const LIVES = 3;
+
+export const BLOCK = {
+  minWidth: 40,
+  maxWidth: 110,
+  height: 36,
+  speed: 240,
+  speedPerLevel: 30,
+  speedJitter: 90,
+  interval: 0.55,
+  intervalScale: 0.88,
+  minInterval: 0.14,
+  dodgePoints: 1,
 };
 
-// Wanted stars: heat thresholds, how many police cars hunt, how fast they are.
-export const WANTED = [
-  { stars: 0, police: 0, policeSpeed: 0 },
-  { stars: 1, police: 1, policeSpeed: 24 },
-  { stars: 2, police: 2, policeSpeed: 27 },
-  { stars: 3, police: 3, policeSpeed: 30 },
-  { stars: 4, police: 3, policeSpeed: 33 },
-  { stars: 5, police: 4, policeSpeed: 36 },
-];
-
-export const CRIME = {
-  stealCar: 1,
-  hitPedestrian: 1,
-  shoot: 1,
-  killPolice: 2,
-  damageCar: 0, // bumping a car is a fine, not a star (keeps driving fun, not punishing)
+export const COIN = {
+  size: 24,
+  speed: 190,
+  speedPerLevel: 14,
+  interval: 1.4,
+  intervalJitter: 0.8,
+  points: 10,
 };
 
-// The story: three jobs for fixer Dario Kestrel. Each mission is a list of steps;
-// a step is a place to reach, a car to steal, or a fight to win.
-export const MISSIONS = [
-  {
-    id: 'first-fare',
-    title: 'JOB 1 — FIRST FARE',
-    client: 'Lena Marlowe',
-    brief: 'Pick up Lena at Solstice Plaza and drive her to the Marina. Mind the traffic — she tips for a smooth ride.',
-    reward: 250,
-    steps: [
-      { kind: 'goto', label: 'Pick up Lena at Solstice Plaza', x: 0, z: 0, radius: 5 },
-      { kind: 'goto', label: 'Drive Lena to the Marina', x: -168, z: -168, radius: 6, needCar: true },
-    ],
-  },
-  {
-    id: 'hot-wheels',
-    title: 'JOB 2 — HOT WHEELS',
-    client: 'Dario Kestrel',
-    brief: 'A gold Comet GT is parked at the Solstice Motors lot. Take it — quietly, if you can — and bring it to Kestrel\u2019s garage. The police will not love this.',
-    reward: 600,
-    steps: [
-      { kind: 'steal', label: 'Steal the gold Comet GT at Solstice Motors', x: -96, z: 120, radius: 4 },
-      { kind: 'goto', label: 'Deliver the Comet GT to Kestrel\u2019s garage', x: 168, z: -168, radius: 6, needCar: true },
-    ],
-  },
-  {
-    id: 'pier-pressure',
-    title: 'JOB 3 — PIER PRESSURE',
-    client: 'Dario Kestrel',
-    brief: 'The Gull Gang runs the old pier and they owe Kestrel money. Clear them out, then get back to the safehouse before their friends arrive.',
-    reward: 900,
-    steps: [
-      { kind: 'goto', label: 'Go to the old pier', x: -216, z: 96, radius: 7 },
-      { kind: 'fight', label: 'Clear out the Gull Gang (4)', x: -232, z: 96, radius: 26, enemies: 4 },
-      { kind: 'goto', label: 'Escape to the safehouse', x: 168, z: 168, radius: 6 },
-    ],
-  },
-];
+/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
+export const LEVEL = { seconds: 12, max: 12 };
 
-export const SAVE_KEY = 'solstice-city-save-v1';
-export const BEST_KEY = 'solstice-city-best-v1';
+/** How many falling things can exist at once; the pool is allocated once, at boot. */
+export const POOL_SIZE = 64;
 
 export const PALETTE = {
-  sky: 0x8ec9ee,
-  sun: 0xfff2cf,
-  sea: 0x2e8fb0,
-  sand: 0xe8d29a,
-  asphalt: 0x3a3f46,
-  sidewalk: 0xb9b3a4,
-  grass: 0x7fae62,
+  backdrop: '#11141b',
+  sky: '#1b1f2a',
+  ground: '#2a3040',
+  player: '#4fc3f7',
+  block: '#e5534b',
+  coin: '#f2c94c',
+  panel: '#252b38',
+  text: '#eef1f5',
+  muted: '#8b93a3',
 };
+
+export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+/** Where the best score is kept between visits (this browser only). */
+export const BEST_KEY = 'block-dodger.best';
