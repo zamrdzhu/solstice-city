@@ -3,17 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<link rel="icon" href="data:,">
+<title>Solstice City — an open-world crime game</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1c2c; font-family: "Segoe UI", system-ui, sans-serif; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* ---- HUD ---- */
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; display: none; }
+  #hud.on { display: block; }
+  .panel { background: rgba(8, 20, 32, 0.62); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; backdrop-filter: blur(2px); }
+  #cashBox { position: absolute; top: 14px; left: 14px; padding: 8px 14px; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  #cashBox small { display: block; font-size: 11px; font-weight: 600; color: #9fd8a8; letter-spacing: 1.5px; }
+  #healthBar { width: 170px; height: 9px; margin-top: 6px; background: rgba(255,255,255,0.18); border-radius: 5px; overflow: hidden; }
+  #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #a8e063); border-radius: 5px; }
+  #starsBox { position: absolute; top: 14px; right: 14px; padding: 8px 14px; font-size: 26px; letter-spacing: 4px; color: #ffd23e; text-shadow: 0 0 8px rgba(255,210,62,0.6); }
+  #starsBox .dim { color: rgba(255,255,255,0.22); text-shadow: none; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 8px 18px; font-size: 15px; font-weight: 600; text-align: center; max-width: 46vw; }
+  #objective small { display: block; font-size: 11px; color: #ffd23e; letter-spacing: 2px; font-weight: 700; }
+  #minimapWrap { position: absolute; left: 14px; bottom: 14px; padding: 6px; border-radius: 12px; }
+  #minimap { display: block; border-radius: 8px; }
+  #speedBox { position: absolute; right: 16px; bottom: 16px; padding: 8px 16px; font-size: 26px; font-weight: 800; text-align: right; }
+  #speedBox small { display: block; font-size: 11px; font-weight: 600; color: #cfe8ff; letter-spacing: 2px; }
+  #toast { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); padding: 10px 22px; font-size: 17px; font-weight: 700; opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+  #hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 13px; color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px #000; white-space: nowrap; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { left: 0; top: 8px; width: 18px; height: 2px; }
+
+  /* ---- Screens ---- */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; text-align: center; z-index: 10; }
+  .screen.on { display: flex; }
+  #titleScreen { background: linear-gradient(180deg, rgba(6,18,32,0.25) 0%, rgba(6,18,32,0.78) 78%); }
+  #titleScreen h1 { font-size: 64px; margin: 0; letter-spacing: 6px; color: #ffd23e; text-shadow: 0 4px 0 #b3541e, 0 8px 24px rgba(0,0,0,0.7); font-style: italic; }
+  #titleScreen h2 { margin: 6px 0 18px; font-size: 17px; font-weight: 500; letter-spacing: 3px; color: #ffe9a8; text-transform: uppercase; }
+  #titleScreen .sub { max-width: 560px; font-size: 15px; line-height: 1.55; color: #e8f2ff; margin: 0 0 22px; }
+  .menuBtn { pointer-events: auto; cursor: pointer; margin: 5px; padding: 12px 34px; font-size: 17px; font-weight: 700; letter-spacing: 1px; color: #10202e; background: #ffd23e; border: none; border-radius: 8px; box-shadow: 0 4px 0 #b3541e; }
+  .menuBtn:hover { background: #ffe066; }
+  .menuBtn.ghost { background: rgba(255,255,255,0.14); color: #fff; box-shadow: none; border: 1px solid rgba(255,255,255,0.4); }
+  #controlsBox { margin-top: 20px; font-size: 13px; line-height: 1.8; color: #cfe0ef; background: rgba(8,20,32,0.55); padding: 12px 22px; border-radius: 10px; }
+  #controlsBox b { color: #ffd23e; }
+  #pauseScreen, #endScreen { background: rgba(4, 12, 22, 0.72); }
+  #pauseScreen h1, #endScreen h1 { font-size: 44px; margin: 0 0 8px; letter-spacing: 4px; color: #ffd23e; }
+  #pauseScreen p, #endScreen p { font-size: 16px; color: #dfeaf5; margin: 4px 0 18px; }
+  #missionList { text-align: left; font-size: 14px; line-height: 1.9; color: #e8f2ff; background: rgba(8,20,32,0.55); padding: 12px 22px; border-radius: 10px; margin-bottom: 18px; }
+  #missionList .done { color: #7fe08a; }
+  #missionList .todo { color: #ffd23e; }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solstice City: an open-world crime game. Drive, steal cars, outrun the police and finish Mara's jobs."></canvas>
 <p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="cashBox" class="panel"><small>SOLSTICE CITY</small>$<span id="cash">0</span><div id="healthBar"><div id="healthFill"></div></div></div>
+  <div id="starsBox" class="panel"><span id="stars"></span></div>
+  <div id="objective" class="panel"><small id="objectiveTag">FREE ROAM</small><span id="objectiveText">Explore Solstice City.</span></div>
+  <div id="minimapWrap" class="panel"><canvas id="minimap" width="190" height="190"></canvas></div>
+  <div id="speedBox" class="panel"><span id="speed">0</span><small id="speedUnit">MPH &middot; ON FOOT</small></div>
+  <div id="toast" class="panel"></div>
+  <div id="hint"></div>
+  <div id="crosshair"></div>
+</div>
+
+<div id="titleScreen" class="screen on">
+  <h1>SOLSTICE CITY</h1>
+  <h2>A sun-soaked open-world crime story</h2>
+  <p class="sub">Mara Voss came back to Solstice City broke and owing the wrong people.
+  Steal cars, outrun the Suncoast Police, and run three jobs for fixer Dario Kestrel
+  to buy her way out &mdash; or just cruise the coast and see what the city offers.</p>
+  <div>
+    <button id="btnContinue" class="menuBtn">CONTINUE</button>
+    <button id="btnNew" class="menuBtn">NEW GAME</button>
+  </div>
+  <div id="missionList"></div>
+  <div id="controlsBox">
+    <b>W A S D</b> move / drive &nbsp;&middot;&nbsp; <b>Mouse</b> look &nbsp;&middot;&nbsp; <b>Click</b> shoot (on foot)<br>
+    <b>E</b> enter / exit car &nbsp;&middot;&nbsp; <b>Space</b> brake / handbrake &nbsp;&middot;&nbsp; <b>Shift</b> sprint<br>
+    <b>P</b> pause &nbsp;&middot;&nbsp; <b>M</b> mute &nbsp;&middot;&nbsp; <b>R</b> restart mission
+  </div>
+</div>
+
+<div id="pauseScreen" class="screen">
+  <h1>PAUSED</h1>
+  <p>Take a breath. The city waits.</p>
+  <div>
+    <button id="btnResume" class="menuBtn">RESUME</button>
+    <button id="btnSaveQuit" class="menuBtn ghost">SAVE &amp; QUIT TO TITLE</button>
+  </div>
+</div>
+
+<div id="endScreen" class="screen">
+  <h1 id="endTitle">BUSTED</h1>
+  <p id="endText"></p>
+  <div>
+    <button id="btnRetry" class="menuBtn">BACK ON THE STREETS</button>
+    <button id="btnEndTitle" class="menuBtn ghost">TITLE SCREEN</button>
+  </div>
+</div>
+
+<script src="./vendor/three.min.js"></script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

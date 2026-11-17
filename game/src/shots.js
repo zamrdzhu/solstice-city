@@ -1,79 +1,92 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// Screenshot staging: ?shot=chase|street|mission|coast&seed=N builds a fixed
+// scene, runs it for a couple of simulated seconds so traffic, police and
+// pedestrians settle into frame, refreshes the HUD, paints it twice and sets
+// window.__shotReady. The same code path as the live game — nothing is faked
+// for the camera.
+export function stageShot(name, game) {
+  game.startPlay(false);
+  const { player } = game;
+  // Driving shots keep the throttle open while settling; on-foot shots stand still.
+  let settleMove = { x: 0, y: 0 };
+  // The chase settles briefly so the police are still flanking the player car
+  // (given longer they converge dead behind it and the camera hides them).
+  let settleSteps = 150;
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
+  if (name === 'chase') {
+    // Cover: Mara fleeing south down the western avenue in a red Sunrunner, two
+    // police cars on her tail, three stars, minimap and a mission objective.
+    const car = game.spawnParkedCar(-72, 0, 0, 0xd94f3d, 'Sunrunner');
+    player.x = -72;
+    player.z = 0;
+    game.enterCar(car);
+    car.speed = 26;
+    startMissionAt(game, 1, 1);
+    game.setStars(3);
+    game.placePoliceBehind();
+    game.hudHint('Wanted: 3 stars — outrun the Suncoast PD!');
+    settleMove = { x: 0, y: 1 };
+    settleSteps = 70;
+  } else if (name === 'street') {
+    // On foot on the plaza avenue: the fountain and tower ahead, traffic and
+    // pedestrians around, the city opening up down the avenue.
+    player.x = 60;
+    player.z = 24;
+    player.camYaw = -Math.PI / 2;
+    player.angle = -Math.PI / 2;
+    startMissionAt(game, 0, 0);
+    game.hudHint('WASD move · E enter car · Click shoot');
+  } else if (name === 'mission') {
+    // The pier job mid-fight: Mara on the planks, Gull Gang shooters ahead,
+    // two stars, the sea on both sides.
+    player.x = -224;
+    player.z = 96;
+    player.camYaw = -Math.PI / 2;
+    player.angle = -Math.PI / 2;
+    player.health = 82;
+    startMissionAt(game, 2, 1);
+    game.spawnMissionEnemies();
+    game.setStars(2);
+    game.hudHint('Clear out the Gull Gang!');
+  } else if (name === 'coast') {
+    // Golden-hour cruise up the beach, palms and the sea to the left.
+    const car = game.spawnParkedCar(-240, -40, Math.PI, 0x4ecdc4, 'Coastline');
+    player.x = -240;
+    player.z = -40;
+    game.enterCar(car);
+    car.speed = 20;
+    game.goldenHour();
+    startMissionAt(game, 0, 0);
+    game.hudHint('The coast road, golden hour.');
+    settleMove = { x: 0, y: 1 };
   }
-  return Infinity;
+
+  // Let the world settle: traffic moves, peds walk, police close in. The
+  // camera math runs every step so the follow camera tracks tightly; the
+  // actual WebGL render runs every 15th step to keep this fast.
+  for (let i = 0; i < settleSteps; i += 1) {
+    game.stepWorld(1 / 60, settleMove, { dx: 0, dy: 0 }, 0);
+    if (game.screen !== 'play') break;
+    game.updateCameraOnly();
+    if (i % 15 === 0) game.renderFrame();
+  }
+  if (name === 'chase') game.pullCameraBack();
+  let painted = 0;
+  function paint() {
+    game.renderFrame();
+    game.refreshHud();
+    painted += 1;
+    if (painted < 2) requestAnimationFrame(paint);
+    else window.__shotReady = true;
+  }
+  requestAnimationFrame(paint);
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
-  }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+function startMissionAt(game, index, step) {
+  game.missions.index = index;
+  game.missions.step = step;
+  game.missions.completed = [];
+  for (let i = 0; i < index; i += 1) game.missions.completed.push(game.missionDefs[i].id);
+  game.missions.active = game.missionDefs[index].steps[step];
+  game.missions.allDone = false;
+  game.missionTitle = game.missionDefs[index].title;
 }
