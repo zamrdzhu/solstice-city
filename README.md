@@ -1,5 +1,11 @@
 # Costa Alba — an open-world crime game (gta6-01)
 
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/zamrdzhu/solstice-city/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/zamrdzhu/solstice-city/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+
+An entry in the [Make GTA 6 bounty](https://make.fun/bounty/gta6-01) on make.fun.
+
 A complete 3D open-world crime game in a sun-soaked modern coastal city of
 our own invention. All names, characters, vehicles, story and art are
 original — nothing borrowed from any commercial game.
